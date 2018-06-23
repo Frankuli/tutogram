@@ -10,7 +10,8 @@ class App extends Component {
       super();
       this.state = {
         user: null,
-        pictures: []
+        pictures: [],
+        uploadValue: 0
       };
 
       this.handleAuth = this.handleAuth.bind(this);
@@ -46,46 +47,55 @@ class App extends Component {
 
   handleUpload (event) {
     const file =  event.target.files[0];
-    const storageRef = firebase.storage().ref('/fotos/');
-    var task = storageRef.child(`${file.name}`).put(file);
+    const storageRef = firebase.storage().ref('fotos/');
+    var uploadTask = storageRef.child(`${file.name}`).put(file);
 
-    task.on('state_changed', (snapshot) => {
-      let percentage = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-      this.setState({
-        uploadValue: percentage
-      })
-    }, (error) => {
-      console.error(error.message)
-    }, () => {/*
-      console.log(task.snapshot);
-      storageRef.child(file.name).getDownloadURL().then((url) => {
-        this.setState({
-          picture: url
-        })
-      })*/
-      const record = {
-        photoURL: this.state.user.photoURL,
-        displayName: this.state.user.displayName,
-        image: task.snapshot.downloadURL
-      }
-      const dbRef = firebase.database().ref('pictures');
-      const newPicture = dbRef.push();
-      newPicture.set(record);
+    //var uploadTask = storageRef.child('images/rivers.jpg').put(file);
+
+  // Register three observers:
+  // 1. 'state_changed' observer, called any time the state changes
+  // 2. Error observer, called on failure
+  // 3. Completion observer, called on successful completion
+  let self = this;
+  uploadTask.on('state_changed', function(snapshot){
+    // Observe state change events such as progress, pause, and resume
+    // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
+    var progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+    console.log('Upload is ' + progress + '% done');
+    self.setState({
+      uploadValue: progress
+    })
+    switch (snapshot.state) {
+      case firebase.storage.TaskState.PAUSED: // or 'paused'
+        console.log('Upload is paused');
+        break;
+      case firebase.storage.TaskState.RUNNING: // or 'running'
+        console.log('Upload is running');
+        break;
+    }
+  }, function(error) {
+    // Handle unsuccessful uploads
+  }, function() {
+    // Handle successful uploads on complete
+    // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+    uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
+      console.log('File available at', downloadURL);
     });
+  });
 
-  }﻿
+  }
 
   renderLoginButton () {
     // si el user esta logeado
+    //console.log(this.state.user);
     if ( this.state.user ) {
       return (
         <div>
-          <img width="100px" height="100px" src= { this.state.user.photoURL}/>
+          <img width="100px" height="100px" src= { this.state.user.photoURL }/>
           <p> Hola {this.state.user.displayName}! </p>
           <button onClick= { this.handleLogout }>Salir</button>
 
-
-          <FileUpload onUpload={ this.handleUpload }/>
+          <FileUpload onUpload={ this.handleUpload } onChange = {this.state.uploadValue}/>
 
           {
             this.state.pictures.map(picture => {
